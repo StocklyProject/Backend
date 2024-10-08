@@ -3,7 +3,7 @@ from src.main import app
 
 client = TestClient(app)
 
-# CI 테스트를 위한 코드
+# CI 테스트 진행
 def test_read_main():
     response = client.get("/")
     assert response.status_code == 200
