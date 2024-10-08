@@ -10,7 +10,7 @@ on:
 
 jobs:
   test_and_push:
-    name: Run tests, check coverage, and push Docker image
+    name: Run tests and push Docker image
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +28,6 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r src/requirements.txt
-          pip3 install coverage
 
       # 3. 태그를 기준으로 버전을 1씩 증가시키는 로직
       - name: Set Image Tag
@@ -68,8 +67,8 @@ jobs:
           ls src/test
           export PYTHONPATH=$GITHUB_WORKSPACE/src
           echo "PYTHONPATH is set to: $PYTHONPATH"
-          python3 -m unittest discover -s src/test -p "test_*.py"
-          
+          pytest src/test --maxfail=1 --disable-warnings -v
+
       # 5. Docker Hub 로그인
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
