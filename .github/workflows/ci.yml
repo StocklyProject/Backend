@@ -65,7 +65,7 @@ jobs:
         run: |
           ls
           ls src/test
-          export PYTHONPATH=$GITHUB_WORKSPACE/src
+          export PYTHONPATH=$GITHUB_WORKSPACE  # 프로젝트 루트 디렉토리를 PYTHONPATH에 추가
           echo "PYTHONPATH is set to: $PYTHONPATH"
           pytest src/test --maxfail=1 --disable-warnings -v
 
