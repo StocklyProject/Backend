@@ -65,10 +65,11 @@ jobs:
       - name: Run tests and display result
         run: |
           ls
+          ls src/test
           export PYTHONPATH=$GITHUB_WORKSPACE/src
           echo "PYTHONPATH is set to: $PYTHONPATH"
           python3 -m unittest discover -s src/test -p "test_*.py"
-
+          
       # 5. Docker Hub 로그인
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
