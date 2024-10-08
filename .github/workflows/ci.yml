@@ -65,7 +65,7 @@ jobs:
       - name: Run tests and display result
         run: |
           ls
-          export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+          export PYTHONPATH=$GITHUB_WORKSPACE/src
           echo "PYTHONPATH is set to: $PYTHONPATH"
           python3 -m unittest discover -s src/test -p "test_*.py"
 
