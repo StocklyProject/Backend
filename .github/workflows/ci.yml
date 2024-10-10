@@ -29,35 +29,24 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install -r src/requirements.txt
 
-      # 3. 태그를 기준으로 버전을 1씩 증가시키는 로직
+      # 3. PR 번호를 가져와서 이미지 태그 설정
       - name: Set Image Tag
         id: set_image_tag
         run: |
-          # 가장 최근 태그를 가져오기 (없으면 1.0.0으로 시작)
-          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) || echo "1.0.0")
-          echo "Latest tag: $LATEST_TAG"
-          
-          # 정규식으로 태그 형식 확인 (e.g., 1.0.0)
-          if [[ $LATEST_TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            MAJOR=${BASH_REMATCH[1]}
-            MINOR=${BASH_REMATCH[2]}
-            PATCH=${BASH_REMATCH[3]}
-            
-            # PATCH 버전을 1 증가
-            PATCH=$((PATCH + 1))
-          else
-            # 기본 태그 값 설정
-            MAJOR=1
-            MINOR=0
-            PATCH=0
-          fi
-          
+          # PR 번호 가져오기 (PR이 아닐 경우 기본값 0 설정)
+          PR_NUMBER="${{ github.event.number || 0 }}"
+          echo "PR Number: $PR_NUMBER"
+
           # main 브랜치인지 확인하여 태그 지정
           if [ "${{ github.ref_name }}" == "main" ]; then
-            echo "IMAGE_TAG=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_ENV
+            IMAGE_TAG="1.0.$PR_NUMBER"
           else
-            echo "IMAGE_TAG=0.${MINOR}.${PATCH}" >> $GITHUB_ENV
+            IMAGE_TAG="0.0.$PR_NUMBER"
           fi
+
+          # 이미지 태그를 환경 변수로 설정
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "Next image tag: $IMAGE_TAG"
         shell: bash
 
       # 4. 유닛 테스트 실행
