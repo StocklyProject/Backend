@@ -49,7 +49,7 @@ jobs:
           PATCH=$(echo $LATEST_TAG | cut -d. -f3)
     
           # main 브랜치일 경우 1번대 버전으로 태그 설정, 아닌 경우 0번대 유지
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "main" ]; then
             PATCH=$((PATCH + 1))
             IMAGE_TAG="$MAJOR.$MINOR.$PATCH"
           else
