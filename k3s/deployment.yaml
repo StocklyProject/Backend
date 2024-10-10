@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: fastapi
-        image: jungeunyoon/stock_server:1.0.14
+        image: jungeunyoon/stock_server:1.0.16
         ports:
         - containerPort: 8000

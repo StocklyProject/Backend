@@ -33,22 +33,14 @@ jobs:
       - name: Set Image Tag based on Docker Hub latest tag
         id: set_image_tag
         run: |
-          # Docker Hub API로 가장 최신 태그를 가져오기
           LATEST_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.DOCKER_TOKEN }}" "https://hub.docker.com/v2/repositories/jungeunyoon/stock_server/tags?page_size=1" | jq -r '.results[0].name')
-    
-          # 태그가 없거나 에러가 발생하면 기본값 설정
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="0.0.0"
           fi
-    
           echo "Latest tag from Docker Hub: $LATEST_TAG"
-    
-          # 최신 태그에서 숫자만 추출
           MAJOR=$(echo $LATEST_TAG | cut -d. -f1)
           MINOR=$(echo $LATEST_TAG | cut -d. -f2)
           PATCH=$(echo $LATEST_TAG | cut -d. -f3)
-    
-          # main 브랜치일 경우 1번대 버전으로 태그 설정, 아닌 경우 0번대 유지
           if [ "${{ github.ref_name }}" == "main" ]; then
             PATCH=$((PATCH + 1))
             IMAGE_TAG="1.0.$PATCH"
@@ -56,18 +48,15 @@ jobs:
             PATCH=$((PATCH + 1))
             IMAGE_TAG="0.0.$PATCH"
           fi
-    
-          # 이미지 태그를 환경 변수로 설정
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "Next image tag: $IMAGE_TAG"
-  
 
       # 4. 유닛 테스트 실행
       - name: Run tests and display result
         run: |
           ls
           ls src/test
-          export PYTHONPATH=$GITHUB_WORKSPACE  # 프로젝트 루트 디렉토리를 PYTHONPATH에 추가
+          export PYTHONPATH=$GITHUB_WORKSPACE
           echo "PYTHONPATH is set to: $PYTHONPATH"
           pytest src/test --maxfail=1 --disable-warnings -v
 
@@ -83,3 +72,17 @@ jobs:
         run: |
           docker build -t jungeunyoon/stock_server:${{ env.IMAGE_TAG }} .
           docker push jungeunyoon/stock_server:${{ env.IMAGE_TAG }}
+
+      # 7. 다른 레포지토리로 코드 푸시
+      - name: Push code to another repository
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          repository: 다른-계정-또는-오가니제이션/다른-레포지토리
+          branch: main  # 또는 원하는 브랜치
+          github_token: ${{ secrets.PUSH_TOKEN }}
+
+      - name: Commit and push changes
+        run: |
+          git add .
+          git commit -m "Automatically pushed by GitHub Actions"
+          git push origin main
