@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: fastapi
-        image: jungeunyoon/stock_server:1.0.1  # Docker 이미지 경로
+        image: jungeunyoon/stock_server:1.0.10  # Docker 이미지 경로
         ports:
         - containerPort: 8000
