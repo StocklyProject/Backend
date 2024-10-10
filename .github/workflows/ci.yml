@@ -33,10 +33,10 @@ jobs:
       - name: Set Image Tag based on Docker Hub latest tag
         id: set_image_tag
         run: |
-          # Docker Hub 리포지토리에서 가장 최신 태그를 가져오기
-          LATEST_TAG=$(curl -s https://registry.hub.docker.com/v1/repositories/jungeunyoon/stock_server/tags | jq -r '.[].name' | sort -V | tail -n 1)
+          # Docker Hub API로 가장 최신 태그를 가져오기
+          LATEST_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.DOCKER_TOKEN }}" "https://hub.docker.com/v2/repositories/jungeunyoon/stock_server/tags?page_size=1" | jq -r '.results[0].name')
     
-          # 태그가 없다면 기본값 설정
+          # 태그가 없거나 에러가 발생하면 기본값 설정
           if [ -z "$LATEST_TAG" ]; then
             LATEST_TAG="0.0.0"
           fi
