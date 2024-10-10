@@ -29,32 +29,38 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install -r src/requirements.txt
 
-      # 3. PR 번호 추적 및 이미지 태그 설정
-      - name: Set Image Tag
+      # 3. PR 번호를 가져와서 이미지 태그 설정
+      - name: Set Image Tag based on Docker Hub latest tag
         id: set_image_tag
         run: |
-          # PR 번호 가져오기 (PR이 아닐 경우에는 기본값 0으로 설정)
-          PR_NUMBER="${{ github.event.pull_request.number || 0 }}"
-          echo "PR Number: $PR_NUMBER"
-          
-          # PR 번호가 있을 경우 그 번호로 태그 설정
-          if [[ "$PR_NUMBER" != "0" ]]; then
-            IMAGE_TAG="1.0.$PR_NUMBER"
-          else
-            # main 브랜치인지 확인하여 태그 지정
-            if [ "${{ github.ref_name }}" == "main" ]; then
-              # main 브랜치로 머지된 경우에도 동일한 태그 유지
-              PR_MERGED_NUMBER=$(git log -1 --pretty=%B | grep -oP '(?<=#)\d+')
-              IMAGE_TAG="1.0.$PR_MERGED_NUMBER"
-            else
-              IMAGE_TAG="0.0.${GITHUB_RUN_NUMBER}"
-            fi
+          # Docker Hub 리포지토리에서 가장 최신 태그를 가져오기
+          LATEST_TAG=$(curl -s https://registry.hub.docker.com/v1/repositories/jungeunyoon/stock_server/tags | jq -r '.[].name' | sort -V | tail -n 1)
+    
+          # 태그가 없다면 기본값 설정
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="0.0.0"
           fi
-
+    
+          echo "Latest tag from Docker Hub: $LATEST_TAG"
+    
+          # 최신 태그에서 숫자만 추출
+          MAJOR=$(echo $LATEST_TAG | cut -d. -f1)
+          MINOR=$(echo $LATEST_TAG | cut -d. -f2)
+          PATCH=$(echo $LATEST_TAG | cut -d. -f3)
+    
+          # main 브랜치일 경우 1번대 버전으로 태그 설정, 아닌 경우 0번대 유지
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            PATCH=$((PATCH + 1))
+            IMAGE_TAG="$MAJOR.$MINOR.$PATCH"
+          else
+            PATCH=$((PATCH + 1))
+            IMAGE_TAG="0.0.$PATCH"
+          fi
+    
           # 이미지 태그를 환경 변수로 설정
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "Next image tag: $IMAGE_TAG"
-        shell: bash
+  
 
       # 4. 유닛 테스트 실행
       - name: Run tests and display result
