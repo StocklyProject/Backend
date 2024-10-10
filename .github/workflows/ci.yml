@@ -29,19 +29,26 @@ jobs:
           python3 -m pip install --upgrade pip
           pip3 install -r src/requirements.txt
 
-      # 3. PR 번호를 가져와서 이미지 태그 설정
+      # 3. PR 번호 추적 및 이미지 태그 설정
       - name: Set Image Tag
         id: set_image_tag
         run: |
-          # PR 번호 가져오기 (PR이 아닐 경우 기본값 0 설정)
-          PR_NUMBER="${{ github.event.number || 0 }}"
+          # PR 번호 가져오기 (PR이 아닐 경우에는 기본값 0으로 설정)
+          PR_NUMBER="${{ github.event.pull_request.number || 0 }}"
           echo "PR Number: $PR_NUMBER"
-
-          # main 브랜치인지 확인하여 태그 지정
-          if [ "${{ github.ref_name }}" == "main" ]; then
+          
+          # PR 번호가 있을 경우 그 번호로 태그 설정
+          if [[ "$PR_NUMBER" != "0" ]]; then
             IMAGE_TAG="1.0.$PR_NUMBER"
           else
-            IMAGE_TAG="0.0.$PR_NUMBER"
+            # main 브랜치인지 확인하여 태그 지정
+            if [ "${{ github.ref_name }}" == "main" ]; then
+              # main 브랜치로 머지된 경우에도 동일한 태그 유지
+              PR_MERGED_NUMBER=$(git log -1 --pretty=%B | grep -oP '(?<=#)\d+')
+              IMAGE_TAG="1.0.$PR_MERGED_NUMBER"
+            else
+              IMAGE_TAG="0.0.${GITHUB_RUN_NUMBER}"
+            fi
           fi
 
           # 이미지 태그를 환경 변수로 설정
