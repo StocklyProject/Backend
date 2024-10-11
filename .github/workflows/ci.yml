@@ -83,8 +83,8 @@ jobs:
           API_TOKEN_GITHUB: ${{ secrets.PUSH_TOKEN }}
         with:
           source-directory: 'output'
-          destination-github-username: jungeunyooon  # 푸시할 유저네임
-          destination-repository-name: Stockly-Project/FastAPI  # 푸시할 레포지토리
+          destination-github-username: Stockly-Project 
+          destination-repository-name: FastAPI  
           user-email: ${{ secrets.EMAIL }}
           commit-message: ${{ github.event.commits[0].message }}
           target-branch: main  # 푸시할 브랜치
