@@ -83,7 +83,7 @@ jobs:
         id: push_directory
         uses: cpina/github-action-push-to-another-repository@main
         env: 
-          API_TOKEN_GITHUB: ${{secrets.AUTO_ACTIONS}}
+          API_TOKEN_GITHUB: ${{ secrets.PUSH_TOKEN }}
         with:
           source-directory: 'output'  # 빌드된 파일이 담긴 output 디렉토리를 지정
           destination-github-username: 'Stockly-Project'  # 대상 유저 또는 오가니제이션
