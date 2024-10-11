@@ -77,7 +77,7 @@ jobs:
       - name: Push code to another repository
         uses: ad-m/github-push-action@v0.6.0
         with:
-          repository: 다른-계정-또는-오가니제이션/다른-레포지토리
+          repository: Stockly-Project/FastAPI
           branch: main  # 또는 원하는 브랜치
           github_token: ${{ secrets.PUSH_TOKEN }}
 
