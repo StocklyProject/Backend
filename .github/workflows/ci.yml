@@ -82,7 +82,7 @@ jobs:
         env: 
           API_TOKEN_GITHUB: ${{ secrets.PUSH_TOKEN }}
         with:
-          # source-directory: 'output'
+          source-directory: '.'
           destination-github-username: Stockly-Project 
           destination-repository-name: FastAPI  
           user-email: ${{ secrets.EMAIL }}
