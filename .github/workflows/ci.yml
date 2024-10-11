@@ -76,18 +76,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      - name: Create output
+        run: sh ./build.sh  # 빌드 스크립트 실행
+      
       - name: Pushes to another repository
         id: push_directory
         uses: cpina/github-action-push-to-another-repository@main
         env: 
-          API_TOKEN_GITHUB: ${{ secrets.PUSH_TOKEN }}
+          API_TOKEN_GITHUB: ${{secrets.AUTO_ACTIONS}}
         with:
-          source-directory: '.'
-          destination-github-username: Stockly-Project 
-          destination-repository-name: FastAPI  
+          source-directory: 'output'  # 빌드된 파일이 담긴 output 디렉토리를 지정
+          destination-github-username: 'Stockly-Project'  # 대상 유저 또는 오가니제이션
+          destination-repository-name: 'FastAPI'  # 푸시할 레포지토리
           user-email: ${{ secrets.EMAIL }}
           commit-message: ${{ github.event.commits[0].message }}
-          target-branch: main  # 푸시할 브랜치
+          target-branch: 'main'  # 푸시할 브랜치
+      
 
       - name: Test get variable exported by push-to-another-repository
         run: echo $DESTINATION_CLONED_DIRECTORY
