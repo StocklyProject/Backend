@@ -3,3 +3,4 @@ src/__pycache__
 src/test/__pycache__
 .pytest_cache
 .idea
+.env
