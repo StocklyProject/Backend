@@ -1,8 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 import mysql.connector
 from src.configs import HOST, USER, PASSWORD, DATABASE
+from src.user import routes as user_routes
 app = FastAPI()
+router = APIRouter(prefix="/api/v1")
+app.include_router(user_routes.router)
 
 app.add_middleware(
     CORSMiddleware,
