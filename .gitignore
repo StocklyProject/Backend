@@ -5,3 +5,4 @@ src/test/__pycache__
 .idea
 .env
 kafka-persistence
+src/stock-producer/__pycache__
