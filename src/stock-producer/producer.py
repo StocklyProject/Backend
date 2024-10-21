@@ -16,7 +16,6 @@ g_appsecret = APP_SECRET
 
 # approval_key를 가져옴
 g_approval_key = get_approval(g_appkey, g_appsecret)
-print(f"Approval Key: {g_approval_key}")
 
 h = {
     "appkey": g_appkey,
