@@ -9,12 +9,43 @@ services:
     ports:
       - "2181:2181"
     environment:
-      - ZOOKEEPER_SERVER_ID=0
       - ALLOW_ANONYMOUS_LOGIN=yes
-      - ZOOKEEPER_CLIENT_PORT=2181
-      - ZOOKEEPER_TICK_TIME=2000
-      - ZOOKEEPER_INIT_LIMIT=5
-      - ZOOKEEPER_SYNC_LIMIT=2
+#      - ZOOKEEPER_CLIENT_PORT=2181
+#      - ZOOKEEPER_TICK_TIME=5000
+#      - ZOOKEEPER_INIT_LIMIT=5
+#      - ZOOKEEPER_SYNC_LIMIT=2
+#      - ZOOKEEPER_SERVER_ID=0
+    volumes:
+       - zookeeper_data:/bitnami
+
+  mysql:
+    image: mysql:latest
+    ports:
+      - "3306:3306"
+    env_file:
+      - .env  # 동일한 환경 변수 파일을 사용
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  redis_insight:
+    image: redislabs/redisinsight:latest
+    container_name: redis_insight
+    ports:
+      - "5540:5540"
+    restart: always
+    networks:
+      - app-network
 
   kafka:
     image: 'bitnami/kafka:latest'
@@ -27,13 +58,12 @@ services:
       - zookeeper
     environment:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_BROKER_ID=0
       - KAFKA_CFG_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://kafka:9094
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - ALLOW_PLAINTEXT_LISTENER=yes
     volumes:
-      - ./kafka-persistence:/bitnami/kafka
+      - kafka_data:/bitnami
 
   kafka-ui:
     image: provectuslabs/kafka-ui
@@ -71,39 +101,11 @@ services:
       timeout: 10s
       retries: 5
 
-  mysql:
-    image: mysql:latest
-    ports:
-      - "3306:3306"
-    env_file:
-      - .env  # 동일한 환경 변수 파일을 사용
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - app-network
-
-  redis:
-    image: redis:latest
-    container_name: redis
-    ports:
-      - "6379:6379"
-    networks:
-      - app-network
-
-  redis_insight:
-    image: redislabs/redisinsight:latest
-    container_name: redis_insight
-    ports:
-      - "5540:5540"
-    restart: always
-    networks:
-      - app-network
-
 networks:
   app-network:
     driver: bridge
 
 volumes:
   db_data:
-  kafka-persistence:
+  zookeeper_data:
+  kafka_data:

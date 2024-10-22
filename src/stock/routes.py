@@ -1,92 +1,64 @@
-# from fastapi import APIRouter
-# from fastapi.responses import StreamingResponse
-# import asyncio
-# from kafka import KafkaConsumer
-# from multiprocessing import Process
-# from .producer import start_websocket
-# import json
-#
-# router = APIRouter(
-#     prefix="/api/v1/stockDetails",
-#     tags=["stockDetails"],
-# )
-#
-# # Kafka Consumer 설정
-# def kafka_consumer(stock_symbol: str):
-#     consumer = KafkaConsumer(
-#         'real_time_stock_prices',
-#         bootstrap_servers=['kafka:9092'],
-#         auto_offset_reset='earliest',
-#         group_id=f'{stock_symbol}_consumer_group',
-#         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
-#     )
-#     return consumer
-#
-# # 종목 코드에 따른 SSE 실시간 스트리밍 함수
-# @router.get("/{stock_symbol}/stream", response_class=StreamingResponse)
-# async def stream_stock_data(stock_symbol: str):
-#     print(f"Received request for stock symbol: {stock_symbol}")  # 로그 추가
-#
-#     async def event_generator():
-#         # 웹소켓을 다른 프로세스로 실행
-#         def run_producer():
-#             print(f"Starting producer for stock symbol: {stock_symbol}")  # 로그 추가
-#             start_websocket(stock_symbol)
-#
-#         producer_process = Process(target=run_producer)
-#         producer_process.start()
-#
-#         # Kafka Consumer로부터 데이터를 읽어와 SSE로 전송
-#         consumer = kafka_consumer(stock_symbol)
-#
-#         try:
-#             for message in consumer:
-#                 stock_data = message.value
-#                 yield f"data: {json.dumps(stock_data)}\n\n"  # 실제 Kafka에서 받은 데이터 SSE로 전송
-#                 print(f"Sending data for stock symbol {stock_symbol} to SSE: {stock_data}")  # 로그 추가
-#                 await asyncio.sleep(1)  # 여유 시간 주기
-#         except Exception as e:
-#             print(f"Error in event generator: {e}")
-#         finally:
-#             consumer.close()
-#
-#     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 import asyncio
-from multiprocessing import Process
-from .producer import send_mock_data, kafka_consumer
+from kafka import KafkaConsumer
+from .producer import start_websocket, init_kafka_producer  # producer.py에서 WebSocket 관련 함수 import
 import json
+from concurrent.futures import ThreadPoolExecutor
+
 
 router = APIRouter(
     prefix="/api/v1/stockDetails",
     tags=["stockDetails"],
 )
 
-# 종목 코드에 따른 SSE 실시간 스트리밍 함수 (Mock 데이터 전용)
+# Kafka Consumer 설정
+def kafka_consumer(stock_symbol: str):
+    return KafkaConsumer(
+        'real_time_stock_prices',
+        bootstrap_servers=['kafka:9092'],  # Kafka 브로커 주소
+        auto_offset_reset='earliest',  # 이 부분에서 'earliest'는 처음부터 메시지를 읽음
+        group_id=f'{stock_symbol}_consumer_group',
+        value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+    )
+
+# WebSocket 백그라운드 작업 실행
+async def run_websocket_background(stock_symbol: str):
+    loop = asyncio.get_event_loop()
+    producer = init_kafka_producer()  # Kafka Producer 초기화
+    with ThreadPoolExecutor() as pool:
+        await loop.run_in_executor(pool, start_websocket, stock_symbol, producer)
+    print(f"WebSocket background task started for stock symbol: {stock_symbol}")
+
+# 종목 코드에 따른 SSE 실시간 스트리밍 함수
 @router.get("/{stock_symbol}/stream", response_class=StreamingResponse)
 async def stream_stock_data(stock_symbol: str):
-    print(f"Received request for stock symbol: {stock_symbol}")  # 로그 추가
+    print(f"Received SSE request for stock symbol: {stock_symbol}")
+
+    # WebSocket 데이터를 백그라운드에서 실행
+    asyncio.create_task(run_websocket_background(stock_symbol))
 
     async def event_generator():
-        # Mock 데이터를 다른 프로세스로 실행
-        mock_process = Process(target=send_mock_data, args=(stock_symbol,))
-        mock_process.start()
-
-        # Kafka Consumer로부터 데이터를 읽어와 SSE로 전송
-        consumer = kafka_consumer(stock_symbol)
+        print("Initializing Kafka consumer...")
+        consumer = kafka_consumer(stock_symbol)  # Kafka Consumer 초기화
+        print(f"Kafka consumer created for stock symbol: {stock_symbol}")
 
         try:
+            # Kafka 메시지를 지속적으로 읽어오기
             for message in consumer:
                 stock_data = message.value
-                yield f"data: {json.dumps(stock_data)}\n\n"  # 실제 Kafka에서 받은 데이터 SSE로 전송
-                print(f"Sending mock data for stock symbol {stock_symbol} to SSE: {stock_data}")  # 로그 추가
-                await asyncio.sleep(1)  # 여유 시간 주기
+                if stock_data:
+                    # SSE로 클라이언트에 메시지 전송
+                    yield f"data: {json.dumps(stock_data)}\n\n"
+                    print(f"Sending data to SSE for stock symbol {stock_symbol}: {stock_data}")
+                    await asyncio.sleep(0.1)  # 메시지 처리 속도 조절
+                else:
+                    print("No data received from Kafka.")
         except Exception as e:
-            print(f"Error in event generator: {e}")
+            print(f"Error in Kafka consumer or SSE generator: {e}")
         finally:
+            # 종료 처리
             consumer.close()
+            print(f"Kafka consumer closed for stock symbol: {stock_symbol}")
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
