@@ -1,20 +1,16 @@
 import json
 from kafka import KafkaProducer
 from .kis_configs import get_approval
-from src.configs import APP_SECRET, APP_KEY
 import os
-
-try:
-    import websocket
-except ImportError:
-    print("websocket-client 설치중입니다.")
-    os.system('python3 -m pip install websocket-client')
-
+import websocket
+import time
+import threading
 
 # Kafka Producer 초기화
 def init_kafka_producer():
     return KafkaProducer(
-        bootstrap_servers=['kafka:9092'],  # Kafka 브로커 주소
+         # bootstrap_servers=['kafka:9092'],  # 도커 컴포즈로 작업 시 Kafka 브로커 주소
+        bootstrap_servers=['kafka.default.svc.cluster.local:9092'],
         api_version=(2, 0, 0),
         value_serializer=lambda v: json.dumps(v).encode('utf-8')  # JSON 직렬화
     )
@@ -66,7 +62,11 @@ def on_error(ws, error):
 def on_close(ws, status_code, close_msg):
     print(f'WebSocket closed with status code={status_code}, message={close_msg}')
 
+APP_KEY = os.getenv("APP_KEY")
+APP_SECRET = os.getenv("APP_SECRET")
+
 def on_open(ws, stock_symbol, producer):
+    print(APP_KEY, APP_SECRET, stock_symbol)
     b = {
         "header": {
             "approval_key": get_approval(APP_KEY, APP_SECRET),
@@ -96,3 +96,36 @@ def start_websocket(stock_symbol, producer):
     )
     print("데이터 내놔 제발")
     ws.run_forever()
+
+
+# 목데이터 생성 함수
+def generate_mock_stock_data(stock_symbol):
+    stock_data = {
+        "date": "2024-10-22",
+        "open": "30000",
+        "close": "30500",
+        "day_high": "31000",
+        "day_low": "29900",
+        "price_change": "+500",
+        "price_change_late": "+1.67%",
+        "volume": "500000",
+        "transaction_volume": "15000000",
+        "volume_price": "300000000"
+    }
+    return stock_data
+
+
+# WebSocket 대신 목데이터를 전송하는 함수
+def start_mock_websocket(stock_symbol, producer):
+    print("starting mock websocket")
+
+    def mock_send_data():
+        while True:
+            stock_data = generate_mock_stock_data(stock_symbol)
+            # Kafka로 목데이터 전송
+            send_to_kafka(producer, 'real_time_stock_prices', stock_data)
+            print(f"Sent mock data to Kafka: {stock_data}")
+            time.sleep(5)  # 5초마다 목데이터 전송
+
+    # 별도의 스레드에서 목데이터 전송
+    threading.Thread(target=mock_send_data).start()

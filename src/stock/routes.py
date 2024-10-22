@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 import asyncio
 from kafka import KafkaConsumer
-from .producer import start_websocket, init_kafka_producer  # producer.py에서 WebSocket 관련 함수 import
+from .producer import start_websocket, init_kafka_producer, start_mock_websocket
 import json
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,7 +16,8 @@ router = APIRouter(
 def kafka_consumer(stock_symbol: str):
     return KafkaConsumer(
         'real_time_stock_prices',
-        bootstrap_servers=['kafka:9092'],  # Kafka 브로커 주소
+        # bootstrap_servers=['kafka:9092'],  # 도커 컴포즈로 작업 시 Kafka 브로커 주소
+        bootstrap_servers=['kafka.default.svc.cluster.local:9092'],
         auto_offset_reset='earliest',  # 이 부분에서 'earliest'는 처음부터 메시지를 읽음
         group_id=f'{stock_symbol}_consumer_group',
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
@@ -27,7 +28,8 @@ async def run_websocket_background(stock_symbol: str):
     loop = asyncio.get_event_loop()
     producer = init_kafka_producer()  # Kafka Producer 초기화
     with ThreadPoolExecutor() as pool:
-        await loop.run_in_executor(pool, start_websocket, stock_symbol, producer)
+        # await loop.run_in_executor(pool, start_websocket, stock_symbol, producer)
+        await loop.run_in_executor(pool, start_mock_websocket, stock_symbol, producer)
     print(f"WebSocket background task started for stock symbol: {stock_symbol}")
 
 # 종목 코드에 따른 SSE 실시간 스트리밍 함수
