@@ -59,10 +59,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/hello")
+@app.get("/")
 def hello():
     return {"message": "메인페이지입니다"}
 
-@app.get("/")
+@app.get("/lifespan")
 async def root():
     return {"message": "Scheduler is running to track stock prices at 9 AM"}
