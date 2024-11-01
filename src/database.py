@@ -27,7 +27,7 @@ async def get_redis():
     return redis
 
 def get_db_connection():
-    user = os.getenv("MYSQL_USER")
+    user = "mysql"
     host = os.getenv("MYSQL_HOST")
     password = os.getenv("MYSQL_PASSWORD")
     database = os.getenv("MYSQL_DATABASE")
