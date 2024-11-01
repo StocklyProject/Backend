@@ -28,11 +28,12 @@ async def get_redis():
 
 def get_db_connection():
     user = os.getenv("MYSQL_USER")
+    host = os.getenv("MYSQL_HOST")
     password = os.getenv("MYSQL_PASSWORD")
     database = os.getenv("MYSQL_DATABASE")
 
     connection = mysql.connector.connect(
-        host="mysql",
+        host=host,
         user=user,
         password=password,
         database=database,
