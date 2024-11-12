@@ -9,10 +9,9 @@ from src.common.producer import send_to_kafka, init_kafka_producer
 from src.logger import logger
 import requests
 from .crud import get_company_details
-from datetime import datetime
 import random
 
-TOPIC_STOCK_DATA = "real_time_stock_prices"
+TOPIC_STOCK_DATA = "real_time_asking_prices"
 
 # Kafka Producer 초기화
 producer = init_kafka_producer()
@@ -21,8 +20,8 @@ def get_approval():
     url = 'https://openapivts.koreainvestment.com:29443/'
     headers = {"content-type": "application/json"}
     body = {"grant_type": "client_credentials",
-            "appkey": os.getenv("APP_KEY"),
-            "secretkey": os.getenv("APP_SECRET")}
+            "appkey": os.getenv("HOGA_KEY"),
+            "secretkey": os.getenv("HOGA_SECRET")}
     PATH = "oauth2/Approval"
     URL = f"{url}/{PATH}"
     res = requests.post(URL, headers=headers, data=json.dumps(body))
@@ -38,7 +37,7 @@ def build_message(app_key, tr_key):
     }
     body = {
         "input": {
-            "tr_id": "H0STCNT0",
+            "tr_id": "H0STASP0",
             "tr_key": tr_key
         }
     }
@@ -87,43 +86,49 @@ def on_error(ws, error):
 def on_close(ws, status_code, close_msg):
     logger.info(f'WebSocket closed with status code={status_code}, message={close_msg}')
 
-# Kafka로 전송할 주식 데이터 처리 함수
+
 def process_data_for_kafka(data, stock_symbol):
     stock_info = get_company_details(stock_symbol)
     id = stock_info.get("id")
     name = stock_info.get("name")
+
     if not stock_info or "id" not in stock_info or "name" not in stock_info:
         logger.error(f"No valid company information for symbol: {stock_symbol}")
         return None
 
     try:
+        # 데이터 파싱
         d1 = data.split("|")
         if len(d1) >= 4:
             recvData = d1[3]
             result = recvData.split("^")
-            if len(result) > 12:
-                # Get the current date
-                current_date = datetime.now().strftime("%Y-%m-%d")
+            if len(result) > 42:  # 필수 호가 데이터가 포함된 최소 인덱스 확인
 
-                # Combine current date with the API time and create a datetime object
-                api_time = result[1]  # Assuming this is in "HHMMSS" format like "094434"
-                full_datetime = datetime.strptime(f"{current_date} {api_time}", "%Y-%m-%d %H%M%S")
+                # 매도 호가 및 잔량 (3~10위)
+                sell_prices = {
+                    f"sell_price_{i + 3}": result[12 - i] for i in range(8)
+                }
+                sell_volumes = {
+                    f"sell_volume_{i + 3}": result[32 - i] for i in range(8)
+                }
 
-                # Format datetime as "YYYY-MM-DD HH:MM:SS"
-                formatted_datetime = full_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                # 매수 호가 및 잔량 (1~8위)
+                buy_prices = {
+                    f"buy_price_{i + 1}": result[13 + i] for i in range(8)
+                }
+                buy_volumes = {
+                    f"buy_volume_{i + 1}": result[33 + i] for i in range(8)
+                }
 
+                # 필요한 정보 딕셔너리 생성
                 stock_data = {
                     "id": id,
-                    "name": name,
                     "symbol": stock_symbol,
-                    "date": formatted_datetime,
-                    "open": result[7],
-                    "close": result[2],
-                    "high": result[8],
-                    "low": result[9],
-                    "rate_price": result[4],
-                    "rate": result[5],
-                    "volume": result[12],
+                    "name": name,
+                    **sell_prices,
+                    **sell_volumes,
+                    **buy_prices,
+                    **buy_volumes
                 }
                 return stock_data
             else:
@@ -132,12 +137,13 @@ def process_data_for_kafka(data, stock_symbol):
         logger.error(f"Error processing stock data for Kafka: {e}")
     return None
 
+
 def handle_message(ws, message, stock_symbols, data_queue):
     if message.startswith("{"):
         try:
             message_data = json.loads(message)
             tr_id = message_data.get("header", {}).get("tr_id")
-            if tr_id == "H0STCNT0" and message_data.get("body", {}).get("rt_cd") == "1":
+            if tr_id == "H0STASP0" and message_data.get("body", {}).get("rt_cd") == "1":
                 logger.info(f"Subscription confirmation for {tr_id} - {message_data}")
                 return
         except json.JSONDecodeError:
@@ -179,16 +185,14 @@ def websocket_thread(stock_symbols, data_queue):
             logger.info("Attempting to reconnect WebSocket...")
 
 # WebSocket 백그라운드 실행 함수
-async def run_websocket_background_multiple(stock_symbols: List[Dict[str, str]]) -> asyncio.Queue:
+async def run_asking_websocket_background_multiple(stock_symbols: List[Dict[str, str]]) -> asyncio.Queue:
     data_queue = asyncio.Queue()
     ws_thread = threading.Thread(target=websocket_thread, args=(stock_symbols, data_queue))
     ws_thread.start()
     return data_queue
 
 
-
-
-# Mock 데이터 생성 함수 - 개별 주식 데이터 생성
+# 개별 주식 데이터 생성 함수
 def generate_single_mock_stock_data(stock_info: Dict[str, str]) -> Dict[str, str]:
     # 주식 정보 조회 및 목업 데이터 생성
     stock = get_company_details(stock_info["symbol"])  # 데이터베이스에서 회사 정보 조회
@@ -198,22 +202,28 @@ def generate_single_mock_stock_data(stock_info: Dict[str, str]) -> Dict[str, str
     else:
         id, name = None, None  # 기본값으로 설정
 
-    return {
+    # 매도 호가 및 잔량 (1~7위)
+    sell_prices = {f"sell_price_{i}": str(random.uniform(30000, 31000)) for i in range(7)}
+    sell_volumes = {f"sell_volume_{i}": str(random.randint(100, 1000)) for i in range(7)}
+
+    # 매수 호가 및 잔량 (1~7위)
+    buy_prices = {f"buy_price_{i}": str(random.uniform(29000, 30000)) for i in range(7)}
+    buy_volumes = {f"buy_volume_{i}": str(random.randint(100, 1000)) for i in range(7)}
+
+    # 필요한 정보 딕셔너리 생성
+    stock_data = {
         "id": id,
         "name": name,
         "symbol": stock_info["symbol"],
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "open": str(random.uniform(50000, 55000)),
-        "close": str(random.uniform(50000, 55000)),
-        "high": str(random.uniform(55000, 60000)),
-        "low": str(random.uniform(50000, 51000)),
-        "rate_price": str(random.uniform(-5, 5)),
-        "rate": str(random.uniform(-2, 2)),
-        "volume": str(random.randint(1000, 5000)),
+        **sell_prices,
+        **sell_volumes,
+        **buy_prices,
+        **buy_volumes
     }
 
-# Mock WebSocket 데이터 생성 및 Queue에 전송
-async def run_mock_websocket_background_multiple(stock_symbols: List[Dict[str, str]]) -> asyncio.Queue:
+    return stock_data
+
+async def run_mock_asking_websocket_background_multiple(stock_symbols: List[Dict[str, str]]) -> asyncio.Queue:
     data_queue = asyncio.Queue()
 
     async def mock_data_producer():
@@ -222,15 +232,7 @@ async def run_mock_websocket_background_multiple(stock_symbols: List[Dict[str, s
                 mock_data = generate_single_mock_stock_data(stock_info)
                 await data_queue.put(json.dumps(mock_data))  # Queue에 JSON 문자열 형태로 데이터 넣기
                 send_to_kafka(producer, TOPIC_STOCK_DATA, json.dumps(mock_data))  # Kafka로 전송
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 
     asyncio.create_task(mock_data_producer())
     return data_queue
-
-# Mock 데이터 SSE 이벤트 생성기
-async def sse_mock_event_generator(stock_symbols: List[Dict[str, str]]):
-    while True:
-        for stock_info in stock_symbols:
-            mock_data = generate_single_mock_stock_data(stock_info)
-            yield f"data: {json.dumps(mock_data)}\n\n"
-        await asyncio.sleep(1)

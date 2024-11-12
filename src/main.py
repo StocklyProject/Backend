@@ -5,55 +5,52 @@ from src.stock import routes as stock_routes
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from .stock.websocket import run_websocket_background_single, run_mock_websocket_background_single
-import asyncio
+from .stock.websocket import run_websocket_background_multiple, run_mock_websocket_background_multiple
+from .stock.price_websocket import run_asking_websocket_background_multiple, run_mock_asking_websocket_background_multiple
 from .logger import logger
 from .stock.crud import get_symbols_for_page
-from typing import List
 
-# 미리 지정된 주식 종목 리스트
-stocks_to_track = ['005930']  # 삼성전자
 
-def get_symbol_list(page: int, page_size: int = 20) -> List[str]:
-    stocks = get_symbols_for_page(page, page_size)
-    symbol_list = [stock["symbol"] for stock in stocks]
-    return symbol_list
+async def schedule_mock_websockets():
+    symbol_list = [{"symbol": symbol} for symbol in get_symbols_for_page(1)]
 
-symbol_list = get_symbol_list(1)
+    try:
+        # 목업 WebSocket 실행하여 큐에 데이터 전송
+        await run_mock_websocket_background_multiple(symbol_list)
+        await run_mock_asking_websocket_background_multiple(symbol_list)
+        logger.debug("Mock WebSocket task completed for multiple stocks.")
+
+    except Exception as e:
+        logger.error(f"Error in mock WebSocket scheduling task: {e}")
 
 # WebSocket 스케줄링 함수
-def schedule_websockets():
-    loop = asyncio.new_event_loop()  # 새로운 이벤트 루프 생성
-    asyncio.set_event_loop(loop)
-    tasks = []
-
-    # 기본 필터링 주기 예: 1m
-    interval = "1m"
-
-    for stock_symbol in symbol_list:
-        task = loop.create_task(run_websocket_background_single(stock_symbol))
-        # task = loop.create_task(run_mock_websocket_background_single(stock_symbol))
-        task.add_done_callback(
-            lambda t: logger.debug(f"Task completed for stock: {stock_symbol}"))
-        tasks.append(task)
-
-    loop.run_until_complete(asyncio.gather(*tasks))  # 모든 작업 완료까지 대기
-
+async def schedule_websockets():
+    symbol_list = [{"symbol": symbol} for symbol in get_symbols_for_page(1)]
+    try:
+        # 다중 심볼을 한 번의 WebSocket으로 처리하도록 symbol_list 전체를 전달
+        await run_websocket_background_multiple(symbol_list)  # Kafka 전송 활성화
+        await run_asking_websocket_background_multiple(symbol_list)
+        logger.debug("WebSocket task completed for multiple stocks.")
+    except Exception as e:
+        logger.error(f"Error in WebSocket scheduling task: {e}")
 
 # lifespan 핸들러 설정
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await schedule_websockets()
+    logger.info("WebSocket scheduling task executed at app startup.")
+
+    # 필요 시 스케줄러를 추가로 사용할 경우
     scheduler = AsyncIOScheduler()
-
-    # 매일 오전 9시 또는 매 분마다 작업 실행
-    # scheduler.add_job(schedule_websockets, CronTrigger(hour=9, minute=0))
-    scheduler.add_job(schedule_websockets, CronTrigger(minute="*"))  # 테스트용 매 분 스케줄링
-
+    # scheduler.add_job(schedule_mock_websockets(), CronTrigger(hour=10, minute=0))  # 매일 오전 10시 실행
+    scheduler.add_job(schedule_websockets, CronTrigger(minute="*/10"))  # 테스트용 매 분 스케줄링
     scheduler.start()
 
-    yield
-    scheduler.shutdown()
-
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler and WebSocket connections are shut down.")
 app = FastAPI(lifespan=lifespan)
 # app = FastAPI()
 router = APIRouter(prefix="/api/v1")
@@ -63,7 +60,7 @@ app.include_router(stock_routes.router)
 # CORS 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,3 +69,5 @@ app.add_middleware(
 @app.get("/")
 def hello():
     return {"message": "메인페이지입니다"}
+
+
