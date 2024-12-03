@@ -52,6 +52,22 @@ CREATE TABLE IF NOT EXISTS notification (
     is_active BOOLEAN DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS order (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    user_id INT NOT NULL,
+    company_id INT NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    price INT NOT NULL,
+    quantity INT NOT NULL,
+    total_price INT NOT NULL,
+    status VARCHAR(100),
+    CONSTRAINT fk_order_user FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_order_company FOREIGN KEY (company_id) REFERENCES company (id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 INSERT INTO company (name, symbol) VALUES
 ('삼성전자', '005930'),
 ('LG', '003550'),
