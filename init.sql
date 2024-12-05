@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS user_data (
   total_asset INT DEFAULT 1000000, -- 초기 자산
   total_stock INT DEFAULT 0, -- 보유한 주식 총 가치
   cash INT DEFAULT 1000000, -- 초기 현금
+  is_daily BOOLEAN DEFAULT TRUE,
   FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 );
 
