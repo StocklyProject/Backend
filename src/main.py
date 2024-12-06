@@ -51,6 +51,7 @@ async def run_websocket_tasks(database: mysql.connector.MySQLConnection = None):
             run_websocket_background_multiple(symbol_list),
             run_asking_websocket_background_multiple(symbol_list)
             # run_websocket_background_multiple_mock(symbol_list),
+            # run_asking_websocket_background_multiple_mock(symbol_list),
         )
     except Exception as e:
         logger.error(f"Error running WebSocket tasks: {e}")
@@ -90,7 +91,7 @@ app.include_router(alert_routes.router)
 # CORS 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["https://stockly-frontend.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
